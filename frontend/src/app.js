@@ -29,7 +29,7 @@
  * ============================================================================
  */
 
-import { createAppKit } from '@reown/appkit';
+// REOWN AppKit not used - Stacks uses WalletConnect Universal Provider directly
 import UniversalProvider from '@walletconnect/universal-provider';
 import { 
   makeUnsignedContractCall,
@@ -211,35 +211,32 @@ function hexToBytes(hex) {
 // REOWN APPKIT + WALLETCONNECT INITIALIZATION
 // ============================================================================
 
-let appKit = null;
+// WalletConnect Universal Provider only (no AppKit for Stacks)
 let universalProvider = null;
 
 /**
  * Initialize REOWN AppKit with WalletConnect Universal Provider
  * This sets up the chain-agnostic transport layer
  */
-async function initializeAppKit() {
+async function initializeWalletConnect() {
   try {
+    console.log('Initializing WalletConnect with project ID:', CONFIG.projectId);
+    
     // Initialize Universal Provider for WalletConnect v2
     universalProvider = await UniversalProvider.init({
       projectId: CONFIG.projectId,
       metadata: CONFIG.metadata,
-      // Stacks namespace configuration
       relayUrl: 'wss://relay.walletconnect.com'
     });
 
-    // Set up event listeners
+    // Display QR code when URI is generated
     universalProvider.on('display_uri', (uri) => {
       console.log('WalletConnect URI:', uri);
-      // AppKit will handle displaying the QR code
+      showQRModal(uri);
     });
 
     universalProvider.on('session_event', (event) => {
       console.log('Session event:', event);
-    });
-
-    universalProvider.on('session_update', ({ topic, params }) => {
-      console.log('Session updated:', topic, params);
     });
 
     universalProvider.on('session_delete', () => {
@@ -247,69 +244,7 @@ async function initializeAppKit() {
       handleDisconnect();
     });
 
-    // Initialize REOWN AppKit for UI
-    // Note: AppKit is used for the connection UI/UX
-    // Actual Stacks operations go through the universal provider
-    appKit = createAppKit({
-      projectId: CONFIG.projectId,
-      metadata: CONFIG.metadata,
-      // Using universal provider for non-EVM chains
-      universalProvider,
-      // Custom Stacks network configuration
-      networks: [{
-        id: STACKS_CHAIN_ID,
-        name: CONFIG.network === 'mainnet' ? 'Stacks Mainnet' : 'Stacks Testnet',
-        nativeCurrency: {
-          name: 'Stacks',
-          symbol: 'STX',
-          decimals: 6
-        },
-        rpcUrls: {
-          default: {
-            http: [CONFIG.network === 'mainnet' 
-              ? 'https://api.mainnet.hiro.so' 
-              : 'https://api.testnet.hiro.so']
-          }
-        },
-        blockExplorers: {
-          default: {
-            name: 'Stacks Explorer',
-            url: CONFIG.network === 'mainnet'
-              ? 'https://explorer.stacks.co'
-              : 'https://explorer.stacks.co/?chain=testnet'
-          }
-        }
-      }],
-      themeMode: 'dark',
-      themeVariables: {
-        '--w3m-accent': '#f7931a',
-        '--w3m-border-radius-master': '12px'
-      }
-    });
-
-    console.log('REOWN AppKit initialized');
-
-    // Subscribe to AppKit provider events for connection state
-    appKit.subscribeProvider((providerState) => {
-      console.log('AppKit provider state:', providerState);
-      
-      if (providerState.isConnected && providerState.address) {
-        // Connected via AppKit
-        state.connected = true;
-        state.address = providerState.address;
-        state.provider = universalProvider;
-        state.session = universalProvider.session;
-        
-        hideStatus();
-        updateUI();
-        
-        // Fetch balances
-        Promise.all([fetchBalances(), fetchReserves()]).catch(console.error);
-      } else if (!providerState.isConnected && state.connected) {
-        // Disconnected
-        handleDisconnect();
-      }
-    });
+    console.log('WalletConnect initialized successfully');
     
     // Check for existing session
     if (universalProvider.session) {
@@ -317,10 +252,70 @@ async function initializeAppKit() {
     }
 
   } catch (error) {
-    console.error('Failed to initialize AppKit:', error);
-    showStatus('Failed to initialize wallet connection', 'error');
+    console.error('Failed to initialize WalletConnect:', error);
+    showStatus('Failed to initialize: ' + error.message, 'error');
   }
 }
+
+// Show QR code modal for WalletConnect
+function showQRModal(uri) {
+  // Create modal if it doesn't exist
+  let modal = document.getElementById('wc-qr-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'wc-qr-modal';
+    modal.className = 'wc-modal';
+    modal.innerHTML = `
+      <div class="wc-modal-content">
+        <div class="wc-modal-header">
+          <h3>Connect Wallet</h3>
+          <button class="wc-close-btn" onclick="closeQRModal()">&times;</button>
+        </div>
+        <div class="wc-modal-body">
+          <p>Scan with your Stacks wallet</p>
+          <div id="wc-qr-container"></div>
+          <div class="wc-uri-section">
+            <input type="text" id="wc-uri-input" readonly>
+            <button onclick="copyWcUri()">Copy</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // Close on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeQRModal();
+    });
+  }
+  
+  // Generate QR code
+  const qrContainer = document.getElementById('wc-qr-container');
+  qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(uri)}" alt="WalletConnect QR" style="border-radius: 12px; background: white; padding: 12px;">`;
+  
+  // Set URI for copy
+  document.getElementById('wc-uri-input').value = uri;
+  
+  modal.style.display = 'flex';
+}
+
+function closeQRModal() {
+  const modal = document.getElementById('wc-qr-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function copyWcUri() {
+  const input = document.getElementById('wc-uri-input');
+  if (input) {
+    navigator.clipboard.writeText(input.value);
+    showStatus('Copied to clipboard!', 'success');
+    setTimeout(hideStatus, 2000);
+  }
+}
+
+// Make functions globally accessible
+window.closeQRModal = closeQRModal;
+window.copyWcUri = copyWcUri;
 
 // ============================================================================
 // WALLET CONNECTION FUNCTIONS
@@ -332,23 +327,15 @@ async function initializeAppKit() {
  */
 async function connectWallet() {
   try {
-    showStatus('Opening wallet...', 'pending');
+    showStatus('Connecting...', 'pending');
 
-    // Ensure AppKit is initialized
-    if (!appKit) {
-      await initializeAppKit();
+    // Initialize WalletConnect if not already done
+    if (!universalProvider) {
+      await initializeWalletConnect();
     }
 
-    // Open REOWN AppKit modal for wallet connection
-    if (appKit && typeof appKit.open === 'function') {
-      console.log('Opening REOWN AppKit modal...');
-      await appKit.open();
-      hideStatus();
-      return; // AppKit will handle connection via subscribeProvider
-    }
-
-    // Fallback: Connect directly via WalletConnect Universal Provider
-    console.log('Fallback: Direct WalletConnect connection');
+    // Connect via WalletConnect - this will trigger display_uri event
+    console.log('Connecting via WalletConnect...');
     const session = await universalProvider.connect({
       namespaces: {
         stacks: {
@@ -359,16 +346,26 @@ async function connectWallet() {
       }
     });
 
+    // Close QR modal on successful connection
+    closeQRModal();
+    
     state.session = session;
     state.provider = universalProvider;
+    
+    // Get Stacks address
     await getStacksAddresses();
+    
     state.connected = true;
     hideStatus();
+    showStatus('Connected!', 'success');
+    setTimeout(hideStatus, 2000);
+    
     updateUI();
     await Promise.all([fetchBalances(), fetchReserves()]);
 
   } catch (error) {
     console.error('Connection failed:', error);
+    closeQRModal();
     showStatus('Connection failed: ' + error.message, 'error');
     setTimeout(hideStatus, 3000);
   }
@@ -962,7 +959,7 @@ async function init() {
   console.log('Pool contract:', `${CONFIG.poolContract.address}.${CONFIG.poolContract.name}`);
 
   // Initialize REOWN AppKit
-  await initializeAppKit();
+  await initializeWalletConnect();
 
   // Fetch initial reserves
   await fetchReserves();
