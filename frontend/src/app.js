@@ -53,11 +53,11 @@ const CONFIG = {
   network: 'mainnet',
   
   // REOWN AppKit Project ID (get from https://cloud.reown.com)
-  projectId: 'YOUR_REOWN_PROJECT_ID', // Replace with your project ID
+  projectId: '904d5b805622ae67732d359178980e74',
   
   // Contract addresses (update after deployment)
   poolContract: {
-    address: 'SP_YOUR_DEPLOYER_ADDRESS', // Update after mainnet deployment
+    address: 'SP31G2FZ5JN87BATZMP4ZRYE5F7WZQDNEXJ7G7X97',
     name: 'pool'
   },
   // Example mainnet SIP-010 tokens (update with your token pair)
