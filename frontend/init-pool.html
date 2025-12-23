@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Initialize Pool - Stacks DEX</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d0d0d;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 { margin-bottom: 8px; color: #f7931a; }
+    .subtitle { color: #888; margin-bottom: 24px; }
+    .info-box {
+      background: #242424;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .info-box p { margin-bottom: 8px; color: #aaa; }
+    .info-box code { color: #f7931a; font-size: 12px; word-break: break-all; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; color: #888; font-size: 14px; }
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      background: #242424;
+      border: 1px solid #333;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 16px;
+    }
+    input:focus { outline: none; border-color: #f7931a; }
+    .helper { font-size: 12px; color: #666; margin-top: 4px; }
+    .btn {
+      width: 100%;
+      padding: 16px;
+      background: #f7931a;
+      border: none;
+      border-radius: 12px;
+      color: #000;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn:hover { background: #ff9f2e; }
+    .btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+    .btn-secondary { background: #333; color: #fff; }
+    .btn-secondary:hover { background: #444; }
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.pending { background: #1a1a3a; color: #88f; }
+    .status.success { background: #1a3a1a; color: #8f8; }
+    .status.error { background: #3a1a1a; color: #f88; }
+    .connected { color: #22c55e; font-size: 14px; margin-bottom: 16px; }
+    .warning { background: #3a2a1a; color: #fa0; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔧 Initialize Pool</h1>
+    <p class="subtitle">Set up ALEX/USDA liquidity pool</p>
+    
+    <div class="info-box">
+      <p><strong>Pool Contract:</strong></p>
+      <code>SP31G2FZ5JN87BATZMP4ZRYE5F7WZQDNEXJ7G7X97.pool</code>
+      <p style="margin-top: 12px;"><strong>Token X (ALEX):</strong></p>
+      <code>SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9.age000-governance-token</code>
+      <p style="margin-top: 12px;"><strong>Token Y (USDA):</strong></p>
+      <code>SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR.usda-token</code>
+    </div>
+
+    <div class="warning">
+      ⚠️ <strong>Important:</strong> Whoever initializes the pool becomes the permanent fee recipient (0.30% of all swaps). Make sure you're connected with your intended wallet!
+    </div>
+
+    <div id="wallet-status"></div>
+
+    <button id="connect-btn" class="btn btn-secondary">Connect Hiro Wallet</button>
+
+    <div id="init-form" style="display: none;">
+      <div class="form-group">
+        <label>ALEX Amount</label>
+        <input type="number" id="amount-x" placeholder="e.g., 829.4" step="any">
+        <p class="helper">Your ALEX tokens to add as initial liquidity (8 decimals)</p>
+      </div>
+
+      <div class="form-group">
+        <label>USDA Amount</label>
+        <input type="number" id="amount-y" placeholder="e.g., 100" step="any">
+        <p class="helper">Your USDA tokens to add as initial liquidity (6 decimals)</p>
+      </div>
+
+      <button id="init-btn" class="btn">Initialize Pool</button>
+    </div>
+
+    <div id="status" class="status"></div>
+  </div>
+
+  <script type="module">
+    import { showConnect, openContractCall, UserSession, AppConfig } from 'https://esm.sh/@stacks/connect@7.7.1';
+    import { uintCV, contractPrincipalCV, PostConditionMode, AnchorMode } from 'https://esm.sh/@stacks/transactions@6.13.0';
+    import { StacksMainnet } from 'https://esm.sh/@stacks/network@6.13.0';
+
+    const CONFIG = {
+      poolContract: { address: 'SP31G2FZ5JN87BATZMP4ZRYE5F7WZQDNEXJ7G7X97', name: 'pool' },
+      tokenX: { address: 'SP3K8BC0PPEVCV7NZ6QSRWPQ2JE9E5B6N3PA0KBR9', name: 'age000-governance-token', decimals: 8, assetName: 'alex' },
+      tokenY: { address: 'SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR', name: 'usda-token', decimals: 6, assetName: 'usda' }
+    };
+
+    const appConfig = new AppConfig(['store_write', 'publish_data']);
+    const userSession = new UserSession({ appConfig });
+    let userAddress = null;
+
+    function showStatus(msg, type) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = `status show ${type}`;
+    }
+
+    function connectWallet() {
+      showConnect({
+        appDetails: { 
+          name: 'Stacks DEX', 
+          icon: window.location.origin + '/favicon.svg' 
+        },
+        redirectTo: '/',
+        onFinish: () => {
+          const userData = userSession.loadUserData();
+          userAddress = userData.profile.stxAddress.mainnet;
+          document.getElementById('wallet-status').innerHTML = `<p class="connected">✓ Connected: ${userAddress.slice(0,6)}...${userAddress.slice(-4)}</p>`;
+          document.getElementById('connect-btn').style.display = 'none';
+          document.getElementById('init-form').style.display = 'block';
+        },
+        onCancel: () => showStatus('Connection cancelled', 'error'),
+        userSession
+      });
+    }
+
+    async function initializePool() {
+      if (!userAddress) {
+        showStatus('Please connect wallet first', 'error');
+        return;
+      }
+
+      const amountXInput = parseFloat(document.getElementById('amount-x').value);
+      const amountYInput = parseFloat(document.getElementById('amount-y').value);
+
+      if (!amountXInput || !amountYInput || amountXInput <= 0 || amountYInput <= 0) {
+        showStatus('Please enter valid amounts', 'error');
+        return;
+      }
+
+      const amountX = Math.floor(amountXInput * Math.pow(10, CONFIG.tokenX.decimals));
+      const amountY = Math.floor(amountYInput * Math.pow(10, CONFIG.tokenY.decimals));
+
+      showStatus(`Initializing pool with ${amountXInput} ALEX and ${amountYInput} USDA...`, 'pending');
+
+      try {
+        openContractCall({
+          contractAddress: CONFIG.poolContract.address,
+          contractName: CONFIG.poolContract.name,
+          functionName: 'initialize-pool',
+          functionArgs: [
+            contractPrincipalCV(CONFIG.tokenX.address, CONFIG.tokenX.name),
+            contractPrincipalCV(CONFIG.tokenY.address, CONFIG.tokenY.name),
+            uintCV(amountX),
+            uintCV(amountY)
+          ],
+          postConditionMode: PostConditionMode.Allow,
+          network: new StacksMainnet(),
+          anchorMode: AnchorMode.Any,
+          onFinish: (data) => {
+            showStatus(`✓ Transaction submitted! TX ID: ${data.txId}`, 'success');
+            console.log('TX:', data);
+          },
+          onCancel: () => showStatus('Transaction cancelled', 'error'),
+          userSession
+        });
+      } catch (err) {
+        showStatus(`Error: ${err.message}`, 'error');
+        console.error(err);
+      }
+    }
+
+    // Check if already signed in
+    if (userSession.isUserSignedIn()) {
+      const userData = userSession.loadUserData();
+      userAddress = userData.profile.stxAddress.mainnet;
+      document.getElementById('wallet-status').innerHTML = `<p class="connected">✓ Connected: ${userAddress.slice(0,6)}...${userAddress.slice(-4)}</p>`;
+      document.getElementById('connect-btn').style.display = 'none';
+      document.getElementById('init-form').style.display = 'block';
+    }
+
+    document.getElementById('connect-btn').addEventListener('click', connectWallet);
+    document.getElementById('init-btn').addEventListener('click', initializePool);
+  </script>
+</body>
+</html>

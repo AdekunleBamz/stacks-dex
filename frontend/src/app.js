@@ -123,7 +123,8 @@ let state = {
   deadlineBlocks: CONFIG.defaultDeadlineBlocks,
   inputAmount: '',
   outputAmount: '',
-  currentBlockHeight: 0
+  currentBlockHeight: 0,
+  swapDirection: true
 };
 
 // ============================================================================
@@ -154,7 +155,10 @@ const elements = {
   slippageBtns: document.querySelectorAll('.slippage-btn'),
   customSlippage: document.getElementById('custom-slippage'),
   deadlineBlocks: document.getElementById('deadline-blocks'),
-  statusMessage: document.getElementById('status-message')
+  statusMessage: document.getElementById('status-message'),
+  swapDirectionBtn: document.getElementById('swap-direction-btn'),
+  tokenXSymbol: document.getElementById('token-x-symbol'),
+  tokenYSymbol: document.getElementById('token-y-symbol')
 };
 
 // ============================================================================
@@ -756,6 +760,34 @@ function parseClarityValue(hex) {
 }
 
 // ============================================================================
+// ============================================================================
+// SWAP DIRECTION TOGGLE
+// ============================================================================
+
+function switchSwapDirection() {
+  state.swapDirection = !state.swapDirection;
+  
+  const fromToken = state.swapDirection ? CONFIG.tokenX : CONFIG.tokenY;
+  const toToken = state.swapDirection ? CONFIG.tokenY : CONFIG.tokenX;
+  
+  if (elements.tokenXSymbol) elements.tokenXSymbol.textContent = fromToken.symbol;
+  if (elements.tokenYSymbol) elements.tokenYSymbol.textContent = toToken.symbol;
+  
+  const balanceFrom = state.swapDirection ? state.balanceX : state.balanceY;
+  const balanceTo = state.swapDirection ? state.balanceY : state.balanceX;
+  
+  if (elements.balanceX) elements.balanceX.textContent = formatAmount(balanceFrom, fromToken.decimals);
+  if (elements.balanceY) elements.balanceY.textContent = formatAmount(balanceTo, toToken.decimals);
+  
+  if (elements.inputAmount) elements.inputAmount.value = '';
+  if (elements.outputAmount) elements.outputAmount.value = '';
+  state.inputAmount = '';
+  state.outputAmount = '';
+  
+  updateSwapDetails();
+  console.log('Swap direction:', state.swapDirection ? 'X→Y' : 'Y→X');
+}
+
 // UI UPDATE FUNCTIONS
 // ============================================================================
 

@@ -20,7 +20,7 @@
       </div>
       <div class="wallet-section">
         <div id="wallet-status" class="wallet-status">
-          <button id="connect-btn" class="btn btn-primary">Connect Wallet</button>
+          <button id="connect-btn" class="btn btn-primary" onclick="window.connectWallet && window.connectWallet()">Connect Wallet</button>
         </div>
         <div id="wallet-info" class="wallet-info hidden">
           <span id="wallet-address" class="wallet-address"></span>
@@ -56,11 +56,8 @@
             >
             <div class="token-selector">
               <button id="token-x-btn" class="token-btn">
-                <span class="token-icon">X</span>
-                <span id="token-x-symbol">TSTX</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M6 9l6 6 6-6"/>
-                </svg>
+                <span class="token-icon">🅰️</span>
+                <span id="token-x-symbol">ALEX</span>
               </button>
             </div>
           </div>
@@ -72,7 +69,7 @@
 
         <!-- Swap Direction Arrow -->
         <div class="swap-direction">
-          <button id="swap-direction-btn" class="swap-arrow-btn" disabled>
+          <button id="swap-direction-btn" class="swap-arrow-btn">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 5v14M5 12l7 7 7-7"/>
             </svg>
@@ -91,11 +88,8 @@
             >
             <div class="token-selector">
               <button id="token-y-btn" class="token-btn">
-                <span class="token-icon">Y</span>
-                <span id="token-y-symbol">TSTY</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M6 9l6 6 6-6"/>
-                </svg>
+                <span class="token-icon">💵</span>
+                <span id="token-y-symbol">USDA</span>
               </button>
             </div>
           </div>
@@ -168,6 +162,29 @@
                 <span>blocks</span>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WalletConnect QR Modal -->
+      <div id="wc-modal" class="modal hidden">
+        <div class="modal-content wc-modal-content">
+          <div class="modal-header">
+            <h3>Connect Wallet</h3>
+            <button id="wc-close" class="icon-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div class="modal-body wc-body">
+            <p class="wc-instruction">Scan with a WalletConnect-compatible Stacks wallet</p>
+            <div id="wc-qrcode" class="wc-qrcode"></div>
+            <div class="wc-copy-section">
+              <input type="text" id="wc-uri" readonly class="wc-uri-input">
+              <button id="wc-copy" class="btn btn-secondary btn-sm">Copy</button>
+            </div>
+            <p class="wc-supported">Supported: Xverse, Leather, Hiro Wallet</p>
           </div>
         </div>
       </div>

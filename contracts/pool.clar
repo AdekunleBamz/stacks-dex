@@ -1,5 +1,5 @@
 ;; ============================================================================
-;; STACKS DEX - Constant Product AMM Pool Contract
+;; STACKS DEX - Constant Product AMM Pool Contract (Clarity 3)
 ;; ============================================================================
 ;; 
 ;; This contract implements a minimal constant-product AMM (x · y = k) for
@@ -7,7 +7,7 @@
 ;;
 ;; Key Features:
 ;; - Single swap direction: Token X → Token Y
-;; - 0.30% fee deducted from input, sent to FEE-RECIPIENT (deployer)
+;; - 0.30% fee deducted from input, sent to fee-recipient (set at init)
 ;; - Slippage protection via min-dy parameter
 ;; - Deadline protection via block-height check
 ;; - No admin functions, no upgradability
@@ -18,7 +18,7 @@
 ;;   dx_to_pool = dx - fee
 ;;   dy = (y * dx_to_pool) / (x + dx_to_pool)
 ;;
-;; The fee (0.30%) is sent to the contract deployer's wallet.
+;; The fee (0.30%) is sent to the fee recipient (whoever initializes the pool).
 ;; ============================================================================
 
 ;; ============================================================================
@@ -36,10 +36,6 @@
 (define-constant FEE_BPS u30)
 (define-constant BPS_DENOM u10000)
 
-;; Fee recipient - the contract deployer (YOUR WALLET)
-;; This is set at deployment time to tx-sender (deployer)
-(define-constant FEE_RECIPIENT tx-sender)
-
 ;; Error codes
 (define-constant ERR_ZERO_INPUT (err u100))
 (define-constant ERR_ZERO_RESERVES (err u101))
@@ -50,10 +46,15 @@
 (define-constant ERR_TRANSFER_Y_FAILED (err u106))
 (define-constant ERR_FEE_TRANSFER_FAILED (err u107))
 (define-constant ERR_ALREADY_INITIALIZED (err u200))
+(define-constant ERR_NOT_INITIALIZED (err u201))
 
 ;; ============================================================================
 ;; DATA VARIABLES
 ;; ============================================================================
+
+;; Fee recipient - set to tx-sender when pool is initialized
+;; This is whoever calls initialize-pool first (should be deployer/you)
+(define-data-var fee-recipient (optional principal) none)
 
 ;; Pool reserves - tracks the current balance of each token in the pool
 (define-data-var reserve-x uint u0)
@@ -79,7 +80,7 @@
   {
     fee-bps: FEE_BPS,
     denom: BPS_DENOM,
-    recipient: FEE_RECIPIENT
+    recipient: (var-get fee-recipient)
   }
 )
 
@@ -134,7 +135,7 @@
 ;; Swap Token X for Token Y
 ;;
 ;; Executes a swap using the constant-product AMM formula.
-;; The fee (0.30%) is sent directly to the FEE_RECIPIENT (deployer wallet).
+;; The fee (0.30%) is sent directly to the fee-recipient (set at initialization).
 ;;
 ;; Parameters:
 ;;   token-x: SIP-010 token contract for input token
@@ -157,13 +158,14 @@
       (rx (var-get reserve-x))
       (ry (var-get reserve-y))
       (sender tx-sender)
+      (fee-addr (unwrap! (var-get fee-recipient) ERR_NOT_INITIALIZED))
     )
     ;; ========================================
     ;; VALIDATION
     ;; ========================================
     
     ;; Check deadline hasn't passed
-    (asserts! (<= block-height deadline) ERR_DEADLINE_EXPIRED)
+    (asserts! (<= stacks-block-height deadline) ERR_DEADLINE_EXPIRED)
     
     ;; Check input is non-zero
     (asserts! (> dx u0) ERR_ZERO_INPUT)
@@ -200,10 +202,10 @@
       ;; EXECUTE TRANSFERS
       ;; ========================================
       
-      ;; 1. Transfer fee from sender to FEE_RECIPIENT (your wallet)
+      ;; 1. Transfer fee from sender to fee-recipient (your wallet)
       (if (> fee u0)
         (unwrap! 
-          (contract-call? token-x transfer fee sender FEE_RECIPIENT none)
+          (contract-call? token-x transfer fee sender fee-addr none)
           ERR_FEE_TRANSFER_FAILED)
         true
       )
@@ -241,6 +243,7 @@
 
 ;; Initialize pool with liquidity
 ;; Can only be called once (when reserves are zero)
+;; The caller (tx-sender) becomes the fee recipient for all future swaps
 ;; Typically called by the deployer to seed initial liquidity
 (define-public (initialize-pool 
     (token-x <ft-trait>)
@@ -250,6 +253,9 @@
   (begin
     ;; Only allow initialization once (when reserves are zero)
     (asserts! (and (is-eq (var-get reserve-x) u0) (is-eq (var-get reserve-y) u0)) ERR_ALREADY_INITIALIZED)
+    
+    ;; Set the fee recipient to whoever initializes the pool (YOU)
+    (var-set fee-recipient (some tx-sender))
     
     ;; Transfer initial liquidity from sender to contract
     (unwrap! 
@@ -263,7 +269,7 @@
     (var-set reserve-x amount-x)
     (var-set reserve-y amount-y)
     
-    (ok { x: amount-x, y: amount-y })
+    (ok { x: amount-x, y: amount-y, fee-recipient: tx-sender })
   )
 )
 
@@ -274,8 +280,10 @@
 ;; Get contract information
 (define-read-only (get-contract-info)
   {
+    name: "stacks-dex-pool",
+    version: "1.0.0",
     fee-bps: FEE_BPS,
-    fee-recipient: FEE_RECIPIENT,
+    fee-recipient: (var-get fee-recipient),
     reserve-x: (var-get reserve-x),
     reserve-y: (var-get reserve-y),
     total-fees: (var-get total-fees-collected)
