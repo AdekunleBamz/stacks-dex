@@ -59,6 +59,8 @@
       font-weight: 600;
       cursor: pointer;
       margin-top: 8px;
+      position: relative;
+      z-index: 10;
     }
     .btn:hover { background: #ff9f2e; }
     .btn:disabled { background: #333; color: #666; cursor: not-allowed; }
@@ -99,7 +101,7 @@
 
     <div id="wallet-status"></div>
 
-    <button id="connect-btn" class="btn btn-secondary">Connect Leather Wallet</button>
+    <button id="connect-btn" class="btn btn-secondary" onclick="connectWallet()">Connect Leather Wallet</button>
 
     <div id="init-form" style="display: none;">
       <div class="form-group">
@@ -114,14 +116,15 @@
         <p class="helper">Your USDA tokens to add as initial liquidity (6 decimals)</p>
       </div>
 
-      <button id="init-btn" class="btn">Initialize Pool</button>
+      <button id="init-btn" class="btn" onclick="initializePool()">Initialize Pool</button>
     </div>
 
     <div id="status" class="status"></div>
   </div>
 
-  <script type="module">
-    import { uintCV, contractPrincipalCV, cvToHex, serializeCV, hexToBytes, bytesToHex } from 'https://esm.sh/@stacks/transactions@6.13.0';
+  <script src="https://unpkg.com/@stacks/transactions@6.13.0/dist/umd/index.js"></script>
+  <script>
+    const { uintCV, contractPrincipalCV, serializeCV, bytesToHex } = StacksTransactions;
 
     const CONFIG = {
       poolContract: { address: 'SP31G2FZ5JN87BATZMP4ZRYE5F7WZQDNEXJ7G7X97', name: 'pool' },
@@ -134,10 +137,12 @@
     function showStatus(msg, type) {
       const el = document.getElementById('status');
       el.textContent = msg;
-      el.className = `status show ${type}`;
+      el.className = 'status show ' + type;
     }
 
     async function connectWallet() {
+      console.log('Connect wallet clicked');
+      
       if (!window.LeatherProvider) {
         showStatus('Leather wallet not found. Please install it from leather.io', 'error');
         return;
@@ -149,16 +154,16 @@
         
         console.log('Leather response:', response);
         
-        const stacksAddress = response.result.addresses.find(
-          addr => addr.type === 'stacks' || addr.address?.startsWith('SP') || addr.address?.startsWith('SM')
-        );
+        const stacksAddress = response.result.addresses.find(function(addr) {
+          return addr.type === 'stacks' || (addr.address && (addr.address.startsWith('SP') || addr.address.startsWith('SM')));
+        });
         
         if (stacksAddress) {
           userAddress = stacksAddress.address;
-          document.getElementById('wallet-status').innerHTML = `<p class="connected">✓ Connected: ${userAddress.slice(0,6)}...${userAddress.slice(-4)}</p>`;
+          document.getElementById('wallet-status').innerHTML = '<p class="connected">✓ Connected: ' + userAddress.slice(0,6) + '...' + userAddress.slice(-4) + '</p>';
           document.getElementById('connect-btn').style.display = 'none';
           document.getElementById('init-form').style.display = 'block';
-          showStatus('', '');
+          document.getElementById('status').className = 'status';
           document.getElementById('status').style.display = 'none';
         } else {
           console.log('All addresses:', response.result.addresses);
@@ -166,11 +171,13 @@
         }
       } catch (err) {
         console.error('Connection error:', err);
-        showStatus(`Connection failed: ${err.message}`, 'error');
+        showStatus('Connection failed: ' + err.message, 'error');
       }
     }
 
     async function initializePool() {
+      console.log('Initialize pool clicked');
+      
       if (!userAddress) {
         showStatus('Please connect wallet first', 'error');
         return;
@@ -187,7 +194,7 @@
       const amountX = Math.floor(amountXInput * Math.pow(10, CONFIG.tokenX.decimals));
       const amountY = Math.floor(amountYInput * Math.pow(10, CONFIG.tokenY.decimals));
 
-      showStatus(`Initializing pool with ${amountXInput} ALEX and ${amountYInput} USDA...`, 'pending');
+      showStatus('Initializing pool with ' + amountXInput + ' ALEX and ' + amountYInput + ' USDA...', 'pending');
 
       try {
         // Build Clarity values and serialize to hex
@@ -207,7 +214,7 @@
         console.log('Calling contract with args:', args);
         
         const response = await window.LeatherProvider.request('stx_callContract', {
-          contract: `${CONFIG.poolContract.address}.${CONFIG.poolContract.name}`,
+          contract: CONFIG.poolContract.address + '.' + CONFIG.poolContract.name,
           functionName: 'initialize-pool',
           functionArgs: args,
           network: 'mainnet',
@@ -216,20 +223,21 @@
         
         console.log('TX Response:', response);
         
-        const txid = response.result?.txid || response.result?.txId;
+        const txid = response.result && (response.result.txid || response.result.txId);
         if (txid) {
-          showStatus(`✓ Transaction submitted! TX ID: ${txid}`, 'success');
+          showStatus('✓ Transaction submitted! TX ID: ' + txid, 'success');
         } else {
           showStatus('Transaction submitted. Check your wallet for status.', 'success');
         }
       } catch (err) {
         console.error('Initialize error:', err);
-        showStatus(`Error: ${err.message}`, 'error');
+        showStatus('Error: ' + err.message, 'error');
       }
     }
 
-    document.getElementById('connect-btn').addEventListener('click', connectWallet);
-    document.getElementById('init-btn').addEventListener('click', initializePool);
+    // Log when page loads
+    console.log('Init pool page loaded');
+    console.log('Leather provider:', window.LeatherProvider ? 'Found' : 'Not found');
   </script>
 </body>
 </html>
