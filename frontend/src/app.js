@@ -39,7 +39,6 @@ import {
   FungibleConditionCode,
   makeStandardFungiblePostCondition,
   AnchorMode,
-  serializeTransaction,
   deserializeTransaction,
   broadcastTransaction
 } from '@stacks/transactions';
@@ -451,7 +450,7 @@ async function signAndBroadcastTransaction(unsignedTx) {
   }
 
   // Serialize the unsigned transaction to hex
-  const serializedTx = bytesToHex(serializeTransaction(unsignedTx));
+  const serializedTx = bytesToHex(unsignedTx.serialize());
 
   console.log('Requesting signature for transaction:', serializedTx);
 
