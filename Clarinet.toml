@@ -1,0 +1,24 @@
+[project]
+name = "stacks-dex"
+description = "Minimal AMM DEX on Stacks Mainnet"
+authors = []
+telemetry = false
+cache_dir = "./.cache"
+
+[contracts.pool]
+path = "contracts/pool.clar"
+
+# Note: For mainnet, use existing SIP-010 tokens instead of test tokens
+# Test tokens are kept for reference only
+
+[[project.requirements]]
+contract_id = "SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard"
+
+[repl.analysis]
+passes = ["check_checker"]
+
+[repl.analysis.check_checker]
+strict = false
+trusted_sender = false
+trusted_caller = false
+callee_filter = false
