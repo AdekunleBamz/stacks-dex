@@ -1078,6 +1078,13 @@ async function executeSwap() {
   // Get reserves based on swap direction
   const reserveIn = state.swapDirection ? state.reserveX : state.reserveY;
   const reserveOut = state.swapDirection ? state.reserveY : state.reserveX;
+  
+  // Check if pool is initialized
+  if (!reserveIn || !reserveOut || reserveIn <= 0 || reserveOut <= 0) {
+    showStatus('Pool not initialized. Please initialize liquidity first.', 'error');
+    return;
+  }
+  
   const inputDecimals = state.swapDirection ? CONFIG.tokenX.decimals : CONFIG.tokenY.decimals;
   const outputDecimals = state.swapDirection ? CONFIG.tokenY.decimals : CONFIG.tokenX.decimals;
   const inputToken = state.swapDirection ? CONFIG.tokenX : CONFIG.tokenY;
@@ -1180,7 +1187,8 @@ async function executeSwap() {
 
   } catch (error) {
     console.error('Swap failed:', error);
-    showStatus('Swap failed: ' + error.message, 'error');
+    const errorMsg = error?.message || error?.reason || (typeof error === 'string' ? error : 'Unknown error');
+    showStatus('Swap failed: ' + errorMsg, 'error');
     setTimeout(hideStatus, 5000);
   }
 }
