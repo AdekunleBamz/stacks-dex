@@ -358,13 +358,18 @@ async function connectWithLeather() {
 async function executeWithLeather(swapParams) {
   const { functionName, amountIn, minAmountOut, deadline, inputToken, outputToken } = swapParams;
   
+  // Contract always expects token-x (ALEX) first, then token-y (USDA)
+  // Regardless of swap direction
+  const tokenX = CONFIG.tokenX;
+  const tokenY = CONFIG.tokenY;
+  
   console.log('Executing Leather swap with @stacks/connect:', {
     functionName,
     amountIn: amountIn.toString(),
     minAmountOut: minAmountOut.toString(),
     deadline,
-    inputToken: `${inputToken.address}.${inputToken.name}`,
-    outputToken: `${outputToken.address}.${outputToken.name}`,
+    tokenX: `${tokenX.address}.${tokenX.name}`,
+    tokenY: `${tokenY.address}.${tokenY.name}`,
     recipient: state.address
   });
   
@@ -374,8 +379,9 @@ async function executeWithLeather(swapParams) {
       contractName: CONFIG.poolContract.name,
       functionName: functionName,
       functionArgs: [
-        contractPrincipalCV(inputToken.address, inputToken.name),
-        contractPrincipalCV(outputToken.address, outputToken.name),
+        // Always token-x first, then token-y (contract signature)
+        contractPrincipalCV(tokenX.address, tokenX.name),
+        contractPrincipalCV(tokenY.address, tokenY.name),
         uintCV(amountIn),
         uintCV(minAmountOut),
         standardPrincipalCV(state.address),
