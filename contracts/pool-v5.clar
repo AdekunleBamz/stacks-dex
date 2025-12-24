@@ -276,7 +276,7 @@
 ;; Contract info
 (define-read-only (get-contract-info)
   { 
-    name: "stacks-dex-pool-v4", 
+    name: "stacks-dex-pool-v5", 
     version: "4.0.0", 
     fee-bps: FEE_BPS, 
     fee-recipient: (var-get fee-recipient), 

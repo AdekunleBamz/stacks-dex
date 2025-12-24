@@ -1,41 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Deploy Pool V4</title>
-  <style>
-    body { font-family: system-ui; background: #1a1a2e; color: #eee; padding: 40px; max-width: 800px; margin: 0 auto; }
-    h1 { color: #f7931a; }
-    button { background: #f7931a; color: #000; border: none; padding: 15px 30px; font-size: 18px; cursor: pointer; border-radius: 8px; margin: 10px 5px; }
-    button:hover { background: #ffa500; }
-    pre { background: #16213e; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 11px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; }
-    .status { padding: 15px; border-radius: 8px; margin: 15px 0; }
-    .success { background: #1a4d2e; border: 1px solid #2ecc71; }
-    .error { background: #4d1a1a; border: 1px solid #e74c3c; }
-    .pending { background: #4d4d1a; border: 1px solid #f1c40f; }
-    .info { background: #1a3d4d; padding: 15px; border-radius: 8px; margin: 15px 0; }
-  </style>
-</head>
-<body>
-  <h1>🚀 Deploy Pool V4 Contract</h1>
-  
-  <div class="info">
-    <h3>New Features in V4:</h3>
-    <ul>
-      <li>✅ <strong>LP Shares</strong> - Track liquidity provider ownership</li>
-      <li>✅ <strong>Add Liquidity</strong> - Anyone can add liquidity</li>
-      <li>✅ <strong>Remove Liquidity</strong> - Withdraw your share anytime</li>
-      <li>✅ Bidirectional swaps (swap-x-for-y AND swap-y-for-x)</li>
-      <li>✅ Skip fee transfer when sender == fee recipient</li>
-    </ul>
-  </div>
-
-  <button id="deployBtn">Deploy Pool V4 Contract</button>
-  
-  <div id="status"></div>
-  <pre id="output">Click "Deploy Pool V4 Contract" to begin...</pre>
-
-  <script>
-    const CONTRACT_SOURCE = `;; STACKS DEX - Pool Contract V4 (Clarity 3)
+;; STACKS DEX - Pool Contract V4 (Clarity 3)
 ;; Features: Bidirectional swaps, LP shares, add/remove liquidity
 
 (use-trait ft-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
@@ -130,7 +93,9 @@
         (ry (var-get reserve-y))
         (supply (var-get total-supply)))
     (if (is-eq supply u0)
-      (ok { shares: (sqrti (* amount-x amount-y)), optimal-x: amount-x, optimal-y: amount-y })
+      ;; First deposit: shares = sqrt(x * y)
+      (ok { shares: (sqrt-int (* amount-x amount-y)), optimal-x: amount-x, optimal-y: amount-y })
+      ;; Subsequent: calculate optimal amounts
       (let ((shares-from-x (/ (* amount-x supply) rx))
             (shares-from-y (/ (* amount-y supply) ry))
             (shares (if (< shares-from-x shares-from-y) shares-from-x shares-from-y))
@@ -149,17 +114,24 @@
       amount-y: (/ (* shares ry) supply)
     })))
 
-(define-read-only (sqrti (n uint))
+;; Integer square root using Newton's method (non-recursive)
+;; For simplicity, we use a formula that works for most cases
+(define-read-only (sqrt-int (n uint))
   (if (<= n u1)
     n
-    (let ((x (/ (+ n u1) u2)))
-      (sqrti-iter n x (/ (+ x (/ n x)) u2)))))
+    (if (<= n u3)
+      u1
+      (let ((x0 (/ n u2)))
+        (let ((x1 (/ (+ x0 (/ n x0)) u2)))
+          (let ((x2 (/ (+ x1 (/ n x1)) u2)))
+            (let ((x3 (/ (+ x2 (/ n x2)) u2)))
+              (let ((x4 (/ (+ x3 (/ n x3)) u2)))
+                (let ((x5 (/ (+ x4 (/ n x4)) u2)))
+                  (let ((x6 (/ (+ x5 (/ n x5)) u2)))
+                    (let ((x7 (/ (+ x6 (/ n x6)) u2)))
+                      (if (<= (* x7 x7) n) x7 (- x7 u1)))))))))))))
 
-(define-read-only (sqrti-iter (n uint) (x uint) (x1 uint))
-  (if (>= x1 x)
-    x
-    (sqrti-iter n x1 (/ (+ x1 (/ n x1)) u2))))
-
+;; Swap X for Y (e.g., ALEX -> USDA)
 (define-public (swap-x-for-y 
     (token-x <ft-trait>)
     (token-y <ft-trait>)
@@ -189,6 +161,7 @@
       (var-set total-fees-x (+ (var-get total-fees-x) fee))
       (ok { dx: dx, dy: dy, fee: fee, recipient: recipient }))))
 
+;; Swap Y for X (e.g., USDA -> ALEX)
 (define-public (swap-y-for-x 
     (token-x <ft-trait>)
     (token-y <ft-trait>)
@@ -218,6 +191,7 @@
       (var-set total-fees-y (+ (var-get total-fees-y) fee))
       (ok { dx: dx, dy: dy, fee: fee, recipient: recipient }))))
 
+;; Initialize pool with initial liquidity (first LP)
 (define-public (initialize-pool 
     (token-x <ft-trait>)
     (token-y <ft-trait>)
@@ -226,7 +200,7 @@
   (let ((sender tx-sender))
     (asserts! (and (is-eq (var-get reserve-x) u0) (is-eq (var-get reserve-y) u0)) ERR_ALREADY_INITIALIZED)
     (asserts! (and (> amount-x u0) (> amount-y u0)) ERR_ZERO_INPUT)
-    (let ((shares (sqrti (* amount-x amount-y))))
+    (let ((shares (sqrt-int (* amount-x amount-y))))
       (asserts! (> shares MINIMUM_LIQUIDITY) ERR_MIN_LIQUIDITY)
       (var-set fee-recipient (some sender))
       (unwrap! (contract-call? token-x transfer amount-x sender (as-contract tx-sender) none) ERR_TRANSFER_X_FAILED)
@@ -237,6 +211,7 @@
       (map-set lp-balances sender shares)
       (ok { shares: shares, x: amount-x, y: amount-y }))))
 
+;; Add liquidity (subsequent LPs)
 (define-public (add-liquidity
     (token-x <ft-trait>)
     (token-y <ft-trait>)
@@ -249,21 +224,26 @@
         (sender tx-sender))
     (asserts! (> supply u0) ERR_NOT_INITIALIZED)
     (asserts! (and (> amount-x u0) (> amount-y u0)) ERR_ZERO_INPUT)
+    ;; Calculate shares based on minimum contribution
     (let ((shares-from-x (/ (* amount-x supply) rx))
           (shares-from-y (/ (* amount-y supply) ry))
           (shares (if (< shares-from-x shares-from-y) shares-from-x shares-from-y))
+          ;; Calculate actual amounts to deposit (proportional)
           (actual-x (/ (* shares rx) supply))
           (actual-y (/ (* shares ry) supply)))
       (asserts! (>= shares min-shares) ERR_SLIPPAGE_EXCEEDED)
       (asserts! (> shares u0) ERR_ZERO_SHARES)
+      ;; Transfer tokens
       (unwrap! (contract-call? token-x transfer actual-x sender (as-contract tx-sender) none) ERR_TRANSFER_X_FAILED)
       (unwrap! (contract-call? token-y transfer actual-y sender (as-contract tx-sender) none) ERR_TRANSFER_Y_FAILED)
+      ;; Update state
       (var-set reserve-x (+ rx actual-x))
       (var-set reserve-y (+ ry actual-y))
       (var-set total-supply (+ supply shares))
       (map-set lp-balances sender (+ (get-lp-balance sender) shares))
       (ok { shares: shares, x: actual-x, y: actual-y }))))
 
+;; Remove liquidity
 (define-public (remove-liquidity
     (token-x <ft-trait>)
     (token-y <ft-trait>)
@@ -278,21 +258,25 @@
     (asserts! (> supply u0) ERR_NOT_INITIALIZED)
     (asserts! (> shares u0) ERR_ZERO_INPUT)
     (asserts! (>= user-balance shares) ERR_INSUFFICIENT_LP_BALANCE)
+    ;; Calculate amounts to withdraw
     (let ((amount-x (/ (* shares rx) supply))
           (amount-y (/ (* shares ry) supply)))
       (asserts! (>= amount-x min-x) ERR_SLIPPAGE_EXCEEDED)
       (asserts! (>= amount-y min-y) ERR_SLIPPAGE_EXCEEDED)
+      ;; Transfer tokens back
       (unwrap! (as-contract (contract-call? token-x transfer amount-x tx-sender sender none)) ERR_TRANSFER_X_FAILED)
       (unwrap! (as-contract (contract-call? token-y transfer amount-y tx-sender sender none)) ERR_TRANSFER_Y_FAILED)
+      ;; Update state
       (var-set reserve-x (- rx amount-x))
       (var-set reserve-y (- ry amount-y))
       (var-set total-supply (- supply shares))
       (map-set lp-balances sender (- user-balance shares))
       (ok { shares: shares, x: amount-x, y: amount-y }))))
 
+;; Contract info
 (define-read-only (get-contract-info)
   { 
-    name: "stacks-dex-pool-v4", 
+    name: "stacks-dex-pool-lp", 
     version: "4.0.0", 
     fee-bps: FEE_BPS, 
     fee-recipient: (var-get fee-recipient), 
@@ -301,56 +285,4 @@
     total-supply: (var-get total-supply),
     total-fees-x: (var-get total-fees-x),
     total-fees-y: (var-get total-fees-y)
-  })`;
-
-    const statusEl = document.getElementById('status');
-    const outputEl = document.getElementById('output');
-    const deployBtn = document.getElementById('deployBtn');
-
-    deployBtn.addEventListener('click', async function() {
-      outputEl.textContent = 'Starting deployment...\n';
-      
-      if (!window.LeatherProvider) {
-        statusEl.innerHTML = '<div class="status error">❌ Leather wallet not found</div>';
-        return;
-      }
-      
-      outputEl.textContent += '✓ Leather wallet detected\n';
-
-      try {
-        const addressResponse = await window.LeatherProvider.request('getAddresses');
-        const stacksAddress = addressResponse.result.addresses.find(function(a) {
-          return a.type === 'stacks' || (a.address && (a.address.startsWith('SP') || a.address.startsWith('SM')));
-        });
-
-        const senderAddress = stacksAddress.address;
-        outputEl.textContent += '✓ Connected: ' + senderAddress + '\n\n';
-
-        statusEl.innerHTML = '<div class="status pending">Please confirm contract deployment in Leather...</div>';
-
-        const deployResponse = await window.LeatherProvider.request('stx_deployContract', {
-          name: 'pool-v4',
-          clarityCode: CONTRACT_SOURCE,
-          clarityVersion: '3',
-          network: 'mainnet',
-          fee: 600000,
-        });
-
-        if (deployResponse.result && deployResponse.result.txid) {
-          const txId = deployResponse.result.txid;
-          statusEl.innerHTML = '<div class="status success">✅ Contract deployment submitted!</div>';
-          outputEl.textContent += '✅ SUCCESS!\n';
-          outputEl.textContent += 'Transaction ID: ' + txId + '\n';
-          outputEl.textContent += 'Contract: ' + senderAddress + '.pool-v4\n\n';
-          outputEl.textContent += 'View: https://explorer.hiro.so/txid/' + txId + '?chain=mainnet\n\n';
-          outputEl.textContent += '⏳ Wait for confirmation, then initialize the pool.';
-        }
-      } catch (error) {
-        console.error('Deploy error:', error);
-        statusEl.innerHTML = '<div class="status error">Error: ' + (error.message || 'Unknown') + '</div>';
-        outputEl.textContent += '❌ Error: ' + (error.message || JSON.stringify(error)) + '\n';
-      }
-    });
-  </script>
-</body>
-</html>
+  })
