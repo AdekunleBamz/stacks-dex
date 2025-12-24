@@ -1074,12 +1074,6 @@ async function executeSwap() {
     return;
   }
 
-  // Currently only ALEX → USDA is supported (swap-x-for-y)
-  if (!state.swapDirection) {
-    showStatus('USDA → ALEX swap not yet supported. Please swap ALEX → USDA instead.', 'error');
-    return;
-  }
-
   const inputAmount = parseFloat(elements.inputAmount.value);
   if (!inputAmount || inputAmount <= 0) {
     showStatus('Please enter a valid amount', 'error');
