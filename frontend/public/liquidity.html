@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Liquidity Pool - Stacks DEX</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui; background: #1a1a2e; color: #eee; padding: 20px; margin: 0; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #f7931a; text-align: center; }
+    .nav { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+    .nav a { color: #f7931a; text-decoration: none; padding: 10px 20px; border: 1px solid #f7931a; border-radius: 8px; }
+    .nav a:hover { background: #f7931a; color: #000; }
+    
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    
+    .card { background: #16213e; border-radius: 12px; padding: 20px; }
+    .card h2 { color: #f7931a; margin-top: 0; font-size: 18px; }
+    .card h3 { color: #aaa; margin: 0 0 15px; font-size: 14px; }
+    
+    .pool-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat { background: #1a1a2e; padding: 12px; border-radius: 8px; }
+    .stat-label { color: #888; font-size: 12px; }
+    .stat-value { color: #fff; font-size: 18px; font-weight: bold; }
+    .stat-sub { color: #666; font-size: 11px; }
+    
+    .input-group { margin-bottom: 15px; }
+    .input-group label { display: block; color: #888; font-size: 12px; margin-bottom: 5px; }
+    .input-row { display: flex; gap: 10px; align-items: center; }
+    input { flex: 1; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #eee; }
+    input:focus { outline: none; border-color: #f7931a; }
+    .token-badge { background: #333; padding: 8px 12px; border-radius: 8px; font-weight: bold; min-width: 70px; text-align: center; }
+    
+    button { background: #f7931a; color: #000; border: none; padding: 14px 24px; font-size: 16px; cursor: pointer; border-radius: 8px; width: 100%; font-weight: bold; }
+    button:hover { background: #ffa500; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #333; font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #888; }
+    .info-value { color: #fff; }
+    
+    .your-position { background: #1a3d4d; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+    .your-position h4 { margin: 0 0 10px; color: #f7931a; }
+    
+    .status { padding: 12px; border-radius: 8px; margin: 15px 0; text-align: center; }
+    .success { background: #1a4d2e; border: 1px solid #2ecc71; }
+    .error { background: #4d1a1a; border: 1px solid #e74c3c; }
+    .pending { background: #4d4d1a; border: 1px solid #f1c40f; }
+    
+    .tabs { display: flex; gap: 5px; margin-bottom: 15px; }
+    .tab { flex: 1; padding: 10px; text-align: center; background: #1a1a2e; border-radius: 8px; cursor: pointer; }
+    .tab.active { background: #f7931a; color: #000; }
+    
+    .connect-prompt { text-align: center; padding: 40px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏊 Liquidity Pool</h1>
+    
+    <div class="nav">
+      <a href="/">Swap</a>
+      <a href="/liquidity.html" style="background: #f7931a; color: #000;">Liquidity</a>
+    </div>
+
+    <div class="grid">
+      <!-- Pool Stats -->
+      <div class="card">
+        <h2>📊 Pool Statistics</h2>
+        <h3>ALEX / USDA</h3>
+        
+        <div class="pool-stats">
+          <div class="stat">
+            <div class="stat-label">ALEX Reserve</div>
+            <div class="stat-value" id="reserveX">-</div>
+            <div class="stat-sub" id="reserveXUsd"></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">USDA Reserve</div>
+            <div class="stat-value" id="reserveY">-</div>
+            <div class="stat-sub" id="reserveYUsd"></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Total LP Shares</div>
+            <div class="stat-value" id="totalSupply">-</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Pool Fee</div>
+            <div class="stat-value">0.30%</div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 15px;">
+          <div class="info-row">
+            <span class="info-label">Price (ALEX/USDA)</span>
+            <span class="info-value" id="priceXY">-</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Price (USDA/ALEX)</span>
+            <span class="info-value" id="priceYX">-</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Total Fees Earned (ALEX)</span>
+            <span class="info-value" id="feesX">-</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Total Fees Earned (USDA)</span>
+            <span class="info-value" id="feesY">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manage Liquidity -->
+      <div class="card">
+        <h2>💧 Manage Liquidity</h2>
+        
+        <div id="connectPrompt" class="connect-prompt">
+          <p>Connect your wallet to manage liquidity</p>
+          <button id="connectBtn">Connect Wallet</button>
+        </div>
+        
+        <div id="liquidityPanel" style="display: none;">
+          <!-- Your Position -->
+          <div class="your-position" id="yourPosition" style="display: none;">
+            <h4>Your Position</h4>
+            <div class="info-row">
+              <span class="info-label">LP Shares</span>
+              <span class="info-value" id="userShares">0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Pool Share</span>
+              <span class="info-value" id="userPoolShare">0%</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Your ALEX</span>
+              <span class="info-value" id="userAlexValue">0</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Your USDA</span>
+              <span class="info-value" id="userUsdaValue">0</span>
+            </div>
+          </div>
+
+          <div class="tabs">
+            <div class="tab active" data-tab="add">Add Liquidity</div>
+            <div class="tab" data-tab="remove">Remove Liquidity</div>
+          </div>
+          
+          <!-- Add Liquidity -->
+          <div id="addPanel">
+            <div class="input-group">
+              <label>ALEX Amount</label>
+              <div class="input-row">
+                <input type="number" id="addAlexAmount" placeholder="0.0" step="any">
+                <span class="token-badge">ALEX</span>
+              </div>
+            </div>
+            <div class="input-group">
+              <label>USDA Amount</label>
+              <div class="input-row">
+                <input type="number" id="addUsdaAmount" placeholder="0.0" step="any">
+                <span class="token-badge">USDA</span>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Estimated LP Shares</span>
+              <span class="info-value" id="estimatedShares">-</span>
+            </div>
+            <button id="addLiquidityBtn">Add Liquidity</button>
+          </div>
+          
+          <!-- Remove Liquidity -->
+          <div id="removePanel" style="display: none;">
+            <div class="input-group">
+              <label>LP Shares to Remove</label>
+              <div class="input-row">
+                <input type="number" id="removeShares" placeholder="0" step="any">
+                <button style="width: auto; padding: 8px 12px; font-size: 12px;" id="maxSharesBtn">MAX</button>
+              </div>
+            </div>
+            <div class="info-row">
+              <span class="info-label">You'll Receive (ALEX)</span>
+              <span class="info-value" id="receiveAlex">-</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">You'll Receive (USDA)</span>
+              <span class="info-value" id="receiveUsda">-</span>
+            </div>
+            <button id="removeLiquidityBtn">Remove Liquidity</button>
+          </div>
+        </div>
+        
+        <div id="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { 
+      uintCV, 
+      contractPrincipalCV,
+      standardPrincipalCV,
+      cvToHex,
+      hexToCV,
+      cvToValue
+    } from 'https://esm.sh/@stacks/transactions@6.13.0';
+
+    const CONFIG = {
+      poolContract: 'SP31G2FZ5JN87BATZMP4ZRYE5F7WZQDNEXJ7G7X97.pool-v4',
+      alexToken: { address: 'SP102V8P0F7JX67ARQ77WEA3D3CFB5XW39REDT0AM', name: 'token-alex', decimals: 8 },
+      usdaToken: { address: 'SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR', name: 'usda-token', decimals: 6 },
+    };
+
+    let state = {
+      connected: false,
+      address: null,
+      reserveX: 0,
+      reserveY: 0,
+      totalSupply: 0,
+      userShares: 0,
+    };
+
+    // Format number with decimals
+    function formatAmount(amount, decimals) {
+      return (amount / Math.pow(10, decimals)).toLocaleString(undefined, { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: decimals 
+      });
+    }
+
+    // Parse amount to smallest units
+    function parseAmount(amount, decimals) {
+      return Math.floor(parseFloat(amount) * Math.pow(10, decimals));
+    }
+
+    // Fetch pool data
+    async function fetchPoolData() {
+      try {
+        const [contractAddr, contractName] = CONFIG.poolContract.split('.');
+        
+        // Get reserves
+        const reservesRes = await fetch(`https://api.mainnet.hiro.so/v2/contracts/call-read/${contractAddr}/${contractName}/get-reserves`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sender: contractAddr, arguments: [] })
+        });
+        const reservesData = await reservesRes.json();
+        
+        if (reservesData.okay) {
+          const result = cvToValue(hexToCV(reservesData.result));
+          state.reserveX = parseInt(result.x);
+          state.reserveY = parseInt(result.y);
+        }
+
+        // Get total supply
+        const supplyRes = await fetch(`https://api.mainnet.hiro.so/v2/contracts/call-read/${contractAddr}/${contractName}/get-total-supply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sender: contractAddr, arguments: [] })
+        });
+        const supplyData = await supplyRes.json();
+        
+        if (supplyData.okay) {
+          state.totalSupply = parseInt(cvToValue(hexToCV(supplyData.result)));
+        }
+
+        // Get fees
+        const feesRes = await fetch(`https://api.mainnet.hiro.so/v2/contracts/call-read/${contractAddr}/${contractName}/get-total-fees`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sender: contractAddr, arguments: [] })
+        });
+        const feesData = await feesRes.json();
+        
+        let feesX = 0, feesY = 0;
+        if (feesData.okay) {
+          const fees = cvToValue(hexToCV(feesData.result));
+          feesX = parseInt(fees['fees-x'] || 0);
+          feesY = parseInt(fees['fees-y'] || 0);
+        }
+
+        updatePoolUI(feesX, feesY);
+      } catch (error) {
+        console.error('Failed to fetch pool data:', error);
+      }
+    }
+
+    // Fetch user's LP balance
+    async function fetchUserBalance() {
+      if (!state.address) return;
+      
+      try {
+        const [contractAddr, contractName] = CONFIG.poolContract.split('.');
+        const userCV = standardPrincipalCV(state.address);
+        
+        const res = await fetch(`https://api.mainnet.hiro.so/v2/contracts/call-read/${contractAddr}/${contractName}/get-user-liquidity`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            sender: contractAddr, 
+            arguments: [cvToHex(userCV)]
+          })
+        });
+        const data = await res.json();
+        
+        if (data.okay) {
+          const result = cvToValue(hexToCV(data.result));
+          state.userShares = parseInt(result.shares || 0);
+          const userX = parseInt(result.x || 0);
+          const userY = parseInt(result.y || 0);
+          
+          updateUserUI(userX, userY);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user balance:', error);
+      }
+    }
+
+    // Update pool UI
+    function updatePoolUI(feesX, feesY) {
+      document.getElementById('reserveX').textContent = formatAmount(state.reserveX, CONFIG.alexToken.decimals);
+      document.getElementById('reserveY').textContent = formatAmount(state.reserveY, CONFIG.usdaToken.decimals);
+      document.getElementById('totalSupply').textContent = state.totalSupply.toLocaleString();
+      document.getElementById('feesX').textContent = formatAmount(feesX, CONFIG.alexToken.decimals);
+      document.getElementById('feesY').textContent = formatAmount(feesY, CONFIG.usdaToken.decimals);
+      
+      if (state.reserveX > 0 && state.reserveY > 0) {
+        const priceXY = (state.reserveY / Math.pow(10, CONFIG.usdaToken.decimals)) / 
+                        (state.reserveX / Math.pow(10, CONFIG.alexToken.decimals));
+        const priceYX = 1 / priceXY;
+        document.getElementById('priceXY').textContent = priceXY.toFixed(6) + ' USDA';
+        document.getElementById('priceYX').textContent = priceYX.toFixed(2) + ' ALEX';
+      }
+    }
+
+    // Update user UI
+    function updateUserUI(userX, userY) {
+      const positionEl = document.getElementById('yourPosition');
+      
+      if (state.userShares > 0) {
+        positionEl.style.display = 'block';
+        document.getElementById('userShares').textContent = state.userShares.toLocaleString();
+        const poolShare = state.totalSupply > 0 ? (state.userShares / state.totalSupply * 100).toFixed(4) : 0;
+        document.getElementById('userPoolShare').textContent = poolShare + '%';
+        document.getElementById('userAlexValue').textContent = formatAmount(userX, CONFIG.alexToken.decimals);
+        document.getElementById('userUsdaValue').textContent = formatAmount(userY, CONFIG.usdaToken.decimals);
+      } else {
+        positionEl.style.display = 'none';
+      }
+    }
+
+    // Connect wallet
+    async function connectWallet() {
+      if (!window.LeatherProvider) {
+        showStatus('Leather wallet not found. Install from leather.io', 'error');
+        return;
+      }
+      
+      try {
+        const response = await window.LeatherProvider.request('getAddresses');
+        const stacksAddr = response.result.addresses.find(a => 
+          a.type === 'stacks' || a.address?.startsWith('SP') || a.address?.startsWith('SM')
+        );
+        
+        if (stacksAddr) {
+          state.connected = true;
+          state.address = stacksAddr.address;
+          document.getElementById('connectPrompt').style.display = 'none';
+          document.getElementById('liquidityPanel').style.display = 'block';
+          await fetchUserBalance();
+        }
+      } catch (error) {
+        showStatus('Failed to connect: ' + error.message, 'error');
+      }
+    }
+
+    // Add liquidity
+    async function addLiquidity() {
+      const alexAmount = parseFloat(document.getElementById('addAlexAmount').value);
+      const usdaAmount = parseFloat(document.getElementById('addUsdaAmount').value);
+      
+      if (!alexAmount || !usdaAmount || alexAmount <= 0 || usdaAmount <= 0) {
+        showStatus('Enter valid amounts', 'error');
+        return;
+      }
+      
+      const alexUnits = parseAmount(alexAmount, CONFIG.alexToken.decimals);
+      const usdaUnits = parseAmount(usdaAmount, CONFIG.usdaToken.decimals);
+      
+      showStatus('Please confirm in wallet...', 'pending');
+      
+      try {
+        const tokenXCV = contractPrincipalCV(CONFIG.alexToken.address, CONFIG.alexToken.name);
+        const tokenYCV = contractPrincipalCV(CONFIG.usdaToken.address, CONFIG.usdaToken.name);
+        
+        // Use add-liquidity if pool initialized, else initialize-pool
+        const functionName = state.totalSupply > 0 ? 'add-liquidity' : 'initialize-pool';
+        const args = state.totalSupply > 0 
+          ? [cvToHex(tokenXCV), cvToHex(tokenYCV), cvToHex(uintCV(alexUnits)), cvToHex(uintCV(usdaUnits)), cvToHex(uintCV(1))]
+          : [cvToHex(tokenXCV), cvToHex(tokenYCV), cvToHex(uintCV(alexUnits)), cvToHex(uintCV(usdaUnits))];
+        
+        const response = await window.LeatherProvider.request('stx_callContract', {
+          contract: CONFIG.poolContract,
+          functionName: functionName,
+          functionArgs: args,
+          network: 'mainnet',
+          postConditionMode: 'allow',
+        });
+        
+        if (response.result?.txid) {
+          showStatus('✅ Transaction submitted! TX: ' + response.result.txid.slice(0, 16) + '...', 'success');
+          setTimeout(() => { fetchPoolData(); fetchUserBalance(); }, 5000);
+        }
+      } catch (error) {
+        showStatus('Error: ' + (error.message || 'Unknown'), 'error');
+      }
+    }
+
+    // Remove liquidity
+    async function removeLiquidity() {
+      const shares = parseInt(document.getElementById('removeShares').value);
+      
+      if (!shares || shares <= 0) {
+        showStatus('Enter valid share amount', 'error');
+        return;
+      }
+      
+      if (shares > state.userShares) {
+        showStatus('Insufficient LP shares', 'error');
+        return;
+      }
+      
+      showStatus('Please confirm in wallet...', 'pending');
+      
+      try {
+        const tokenXCV = contractPrincipalCV(CONFIG.alexToken.address, CONFIG.alexToken.name);
+        const tokenYCV = contractPrincipalCV(CONFIG.usdaToken.address, CONFIG.usdaToken.name);
+        
+        const response = await window.LeatherProvider.request('stx_callContract', {
+          contract: CONFIG.poolContract,
+          functionName: 'remove-liquidity',
+          functionArgs: [
+            cvToHex(tokenXCV),
+            cvToHex(tokenYCV),
+            cvToHex(uintCV(shares)),
+            cvToHex(uintCV(1)), // min-x
+            cvToHex(uintCV(1)), // min-y
+          ],
+          network: 'mainnet',
+          postConditionMode: 'allow',
+        });
+        
+        if (response.result?.txid) {
+          showStatus('✅ Transaction submitted! TX: ' + response.result.txid.slice(0, 16) + '...', 'success');
+          setTimeout(() => { fetchPoolData(); fetchUserBalance(); }, 5000);
+        }
+      } catch (error) {
+        showStatus('Error: ' + (error.message || 'Unknown'), 'error');
+      }
+    }
+
+    // Calculate estimated shares
+    function calculateEstimatedShares() {
+      const alexAmount = parseFloat(document.getElementById('addAlexAmount').value) || 0;
+      const usdaAmount = parseFloat(document.getElementById('addUsdaAmount').value) || 0;
+      
+      if (alexAmount <= 0 || usdaAmount <= 0) {
+        document.getElementById('estimatedShares').textContent = '-';
+        return;
+      }
+      
+      const alexUnits = parseAmount(alexAmount, CONFIG.alexToken.decimals);
+      const usdaUnits = parseAmount(usdaAmount, CONFIG.usdaToken.decimals);
+      
+      if (state.totalSupply === 0) {
+        // First LP: sqrt(x * y)
+        const shares = Math.floor(Math.sqrt(alexUnits * usdaUnits));
+        document.getElementById('estimatedShares').textContent = shares.toLocaleString();
+      } else {
+        // Subsequent: min of ratios
+        const sharesFromX = Math.floor(alexUnits * state.totalSupply / state.reserveX);
+        const sharesFromY = Math.floor(usdaUnits * state.totalSupply / state.reserveY);
+        const shares = Math.min(sharesFromX, sharesFromY);
+        document.getElementById('estimatedShares').textContent = shares.toLocaleString();
+      }
+    }
+
+    // Calculate receive amounts
+    function calculateReceiveAmounts() {
+      const shares = parseInt(document.getElementById('removeShares').value) || 0;
+      
+      if (shares <= 0 || state.totalSupply === 0) {
+        document.getElementById('receiveAlex').textContent = '-';
+        document.getElementById('receiveUsda').textContent = '-';
+        return;
+      }
+      
+      const amountX = Math.floor(shares * state.reserveX / state.totalSupply);
+      const amountY = Math.floor(shares * state.reserveY / state.totalSupply);
+      
+      document.getElementById('receiveAlex').textContent = formatAmount(amountX, CONFIG.alexToken.decimals);
+      document.getElementById('receiveUsda').textContent = formatAmount(amountY, CONFIG.usdaToken.decimals);
+    }
+
+    function showStatus(message, type) {
+      const el = document.getElementById('status');
+      el.innerHTML = '<div class="status ' + type + '">' + message + '</div>';
+    }
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        const tabName = tab.dataset.tab;
+        document.getElementById('addPanel').style.display = tabName === 'add' ? 'block' : 'none';
+        document.getElementById('removePanel').style.display = tabName === 'remove' ? 'block' : 'none';
+      });
+    });
+
+    // Event listeners
+    document.getElementById('connectBtn').addEventListener('click', connectWallet);
+    document.getElementById('addLiquidityBtn').addEventListener('click', addLiquidity);
+    document.getElementById('removeLiquidityBtn').addEventListener('click', removeLiquidity);
+    document.getElementById('addAlexAmount').addEventListener('input', calculateEstimatedShares);
+    document.getElementById('addUsdaAmount').addEventListener('input', calculateEstimatedShares);
+    document.getElementById('removeShares').addEventListener('input', calculateReceiveAmounts);
+    document.getElementById('maxSharesBtn').addEventListener('click', () => {
+      document.getElementById('removeShares').value = state.userShares;
+      calculateReceiveAmounts();
+    });
+
+    // Initialize
+    fetchPoolData();
+    setInterval(fetchPoolData, 30000);
+  </script>
+</body>
+</html>
