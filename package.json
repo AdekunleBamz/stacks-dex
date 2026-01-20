@@ -1,0 +1,47 @@
+{
+  "name": "stacks-dex",
+  "version": "1.0.0",
+  "description": "Minimal, production-credible decentralized exchange (DEX) on Stacks implementing a constant-product AMM for token trading",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install && cd frontend && npm install",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "preview:frontend": "cd frontend && npm run preview",
+    "lint:frontend": "cd frontend && npm run lint",
+    "clarinet:check": "clarinet check",
+    "clarinet:test": "clarinet test",
+    "clarinet:console": "clarinet console",
+    "clarinet:integrate": "clarinet integrate"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AdekunleBamz/stacks-dex.git"
+  },
+  "keywords": [
+    "stacks",
+    "clarity",
+    "blockchain",
+    "dex",
+    "amm",
+    "decentralized-exchange",
+    "defi",
+    "smart-contracts",
+    "web3",
+    "bitcoin",
+    "token-trading"
+  ],
+  "author": "Adekunle Bamz",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/AdekunleBamz/stacks-dex/issues"
+  },
+  "homepage": "https://github.com/AdekunleBamz/stacks-dex#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "type": "module"
+}
