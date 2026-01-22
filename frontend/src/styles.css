@@ -601,8 +601,39 @@ body {
    WalletConnect Modal
    ============================================================================ */
 
-.wc-modal-content {
-  max-width: 380px;
+.confirm-modal-content {
+  max-width: 420px;
+}
+
+.confirm-details {
+  margin-bottom: var(--spacing-lg);
+}
+
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.confirm-row:last-child {
+  border-bottom: none;
+}
+
+.confirm-row span:first-child {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.confirm-row span:last-child {
+  font-weight: 500;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
 }
 
 .wc-body {

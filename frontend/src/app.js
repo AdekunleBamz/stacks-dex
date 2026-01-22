@@ -156,7 +156,16 @@ const elements = {
   statusMessage: document.getElementById('status-message'),
   swapDirectionBtn: document.getElementById('swap-direction-btn'),
   tokenXSymbol: document.getElementById('token-x-symbol'),
-  tokenYSymbol: document.getElementById('token-y-symbol')
+  tokenYSymbol: document.getElementById('token-y-symbol'),
+  confirmModal: document.getElementById('confirm-modal'),
+  confirmClose: document.getElementById('confirm-close'),
+  confirmPayAmount: document.getElementById('confirm-pay-amount'),
+  confirmReceiveAmount: document.getElementById('confirm-receive-amount'),
+  confirmRate: document.getElementById('confirm-rate'),
+  confirmSlippage: document.getElementById('confirm-slippage'),
+  confirmDeadline: document.getElementById('confirm-deadline'),
+  confirmCancel: document.getElementById('confirm-cancel'),
+  confirmSwap: document.getElementById('confirm-swap')
 };
 
 // ==============================================================================
@@ -1100,12 +1109,16 @@ async function executeSwap() {
   const outputDecimals = state.swapDirection ? CONFIG.tokenY.decimals : CONFIG.tokenX.decimals;
   const inputToken = state.swapDirection ? CONFIG.tokenX : CONFIG.tokenY;
   const outputToken = state.swapDirection ? CONFIG.tokenY : CONFIG.tokenX;
-  const functionName = state.swapDirection ? 'swap-x-for-y' : 'swap-y-for-x';
-
+  const inputSymbol = state.swapDirection ? CONFIG.tokenX.symbol : CONFIG.tokenY.symbol;
+  const outputSymbol = state.swapDirection ? CONFIG.tokenY.symbol : CONFIG.tokenX.symbol;
+  
   const amountIn = parseAmount(inputAmount.toString(), inputDecimals);
   const expectedOutput = calculateSwapOutput(amountIn, reserveIn, reserveOut);
   const minAmountOut = Math.floor(expectedOutput * (1 - state.slippage / 100));
-
+  
+  // Calculate rate
+  const rate = (expectedOutput / amountIn) * Math.pow(10, inputDecimals - outputDecimals);
+  
   // Calculate deadline
   try {
     const blockResponse = await fetch(
@@ -1119,35 +1132,106 @@ async function executeSwap() {
     console.error('Failed to fetch block height:', e);
   }
   
-  const deadline = state.currentBlockHeight + state.deadlineBlocks;
+  const deadline = state.deadlineBlocks;
+  
+  // Show confirmation modal
+  const swapParams = {
+    inputAmount: amountIn,
+    expectedOutput,
+    minAmountOut,
+    inputSymbol,
+    outputSymbol,
+    rate,
+    slippage: state.slippage,
+    deadline,
+    inputToken,
+    outputToken,
+    functionName: state.swapDirection ? 'swap-x-for-y' : 'swap-y-for-x'
+  };
+  
+  showConfirmModal(swapParams);
+}
 
+async function performSwap(swapParams) {
+  const { functionName, amountIn, minAmountOut, deadline, inputToken, outputToken } = swapParams;
+  
+  const actualDeadline = state.currentBlockHeight + deadline;
+  
   showStatus('Preparing swap...', 'pending');
-
+  
   try {
     // Create swap parameters
-    const swapParams = {
+    const finalSwapParams = {
       functionName,
       amountIn,
       minAmountOut,
-      deadline,
+      deadline: actualDeadline,
       inputToken,
       outputToken
     };
 
     showStatus('Please confirm in wallet...', 'pending');
-
     let txId;
     
     // Route to appropriate execution method based on wallet type
     if (state.providerType === 'leather') {
       // Use Leather's native stx_callContract
-      txId = await executeWithLeather(swapParams);
+      txId = await executeWithLeather(finalSwapParams);
     } else if (state.providerType === 'xverse') {
       // Use Xverse's native method
-      txId = await executeWithXverse(swapParams);
+      txId = await executeWithXverse(finalSwapParams);
     } else {
       // Build transaction for WalletConnect
       const postConditions = [
+        makeStandardFungiblePostCondition(
+          state.address,
+          FungibleConditionCode.Equal,
+          amountIn,
+          createAssetInfo(inputToken.address, inputToken.name, inputToken.assetName)
+        )
+      ];
+
+      const txOptions = {
+        contractAddress: CONFIG.poolContract.address,
+        contractName: CONFIG.poolContract.name,
+        functionName: functionName,
+        functionArgs: [
+          uintCV(amountIn),
+          uintCV(minAmountOut),
+          uintCV(actualDeadline),
+          principalCV(`${inputToken.address}.${inputToken.name}`),
+          principalCV(`${outputToken.address}.${outputToken.name}`)
+        ],
+        network: stacksNetwork,
+        postConditionMode: PostConditionMode.Deny,
+        postConditions: postConditions,
+        anchorMode: AnchorMode.Any,
+        fee: 10000
+      };
+
+      const unsignedTx = await makeUnsignedContractCall(txOptions);
+      txId = await signWithWalletConnect(unsignedTx);
+    }
+
+    showStatus(`Swap submitted! TX: ${txId.slice(0, 10)}...`, 'success');
+    
+    // Open explorer
+    const explorerUrl = CONFIG.network === 'mainnet'
+      ? `https://explorer.hiro.so/txid/${txId}?chain=mainnet`
+      : `https://explorer.hiro.so/txid/${txId}?chain=testnet`;
+    window.open(explorerUrl, '_blank');
+    
+    // Clear inputs and refresh
+    elements.inputAmount.value = '';
+    elements.outputAmount.value = '';
+    hideConfirmModal();
+    await fetchBalances();
+    await fetchReserves();
+  } catch (error) {
+    console.error('Swap failed:', error);
+    showStatus('Swap failed: ' + error.message, 'error');
+  }
+}
         makeStandardFungiblePostCondition(
           state.address,
           FungibleConditionCode.Equal,
@@ -1283,12 +1367,25 @@ function initEventListeners() {
     if (e.target === elements.settingsModal) closeSettings();
   });
   
+  // Confirm modal
+  elements.confirmClose?.addEventListener('click', hideConfirmModal);
+  elements.confirmCancel?.addEventListener('click', hideConfirmModal);
+  elements.confirmSwap?.addEventListener('click', () => {
+    if (currentSwapParams) {
+      performSwap(currentSwapParams);
+    }
+  });
+  elements.confirmModal?.addEventListener('click', (e) => {
+    if (e.target === elements.confirmModal) hideConfirmModal();
+  });
+  
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeSettings();
       closeWalletModal();
       closeQRModal();
+      hideConfirmModal();
     }
   });
 }
@@ -1332,6 +1429,30 @@ async function init() {
   }
   
   console.log('DEX initialized');
+}
+
+// ======================
+========================================================                   // CONFIRMATION MODAL FUNCTIONS
+// ======================
+========================================================                   
+let currentSwapParams = null;
+
+function showConfirmModal(swapParams) {
+  currentSwapParams = swapParams;
+  const { inputAmount, expectedOutput, minAmountOut, inputSymbol, outputSymbol, rate, slippage, deadline } = swapParams;
+  
+  elements.confirmPayAmount.textContent = `${formatAmount(inputAmount, state.swapDirection ? CONFIG.tokenX.decimals : CONFIG.tokenY.decimals)} ${inputSymbol}`;
+  elements.confirmReceiveAmount.textContent = `${formatAmount(expectedOutput, state.swapDirection ? CONFIG.tokenY.decimals : CONFIG.tokenX.decimals)} ${outputSymbol}`;
+  elements.confirmRate.textContent = `1 ${inputSymbol} = ${rate.toFixed(6)} ${outputSymbol}`;
+  elements.confirmSlippage.textContent = `${slippage}%`;
+  elements.confirmDeadline.textContent = `${deadline} blocks`;
+  
+  elements.confirmModal.classList.remove('hidden');
+}
+
+function hideConfirmModal() {
+  elements.confirmModal.classList.add('hidden');
+  currentSwapParams = null;
 }
 
 // Start app
