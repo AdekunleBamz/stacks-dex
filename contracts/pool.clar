@@ -89,6 +89,11 @@
   (var-get total-fees-collected)
 )
 
+;; Get fee recipient address
+(define-read-only (get-fee-recipient)
+  (var-get fee-recipient)
+)
+
 ;; Quote: Calculate output amount for a given input
 ;; 
 ;; Parameters:
