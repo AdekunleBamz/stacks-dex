@@ -170,6 +170,48 @@
         </div>
       </div>
 
+      <!-- Swap Confirmation Modal -->
+      <div id="confirm-modal" class="modal hidden">
+        <div class="modal-content confirm-modal-content">
+          <div class="modal-header">
+            <h3>Confirm Swap</h3>
+            <button id="confirm-close" class="icon-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="confirm-details">
+              <div class="confirm-row">
+                <span>You pay</span>
+                <span id="confirm-pay-amount">0.00 ALEX</span>
+              </div>
+              <div class="confirm-row">
+                <span>You receive</span>
+                <span id="confirm-receive-amount">0.00 USDA</span>
+              </div>
+              <div class="confirm-row">
+                <span>Exchange rate</span>
+                <span id="confirm-rate">1 ALEX = 0.00 USDA</span>
+              </div>
+              <div class="confirm-row">
+                <span>Slippage tolerance</span>
+                <span id="confirm-slippage">0.5%</span>
+              </div>
+              <div class="confirm-row">
+                <span>Transaction deadline</span>
+                <span id="confirm-deadline">20 blocks</span>
+              </div>
+            </div>
+            <div class="confirm-actions">
+              <button id="confirm-cancel" class="btn btn-secondary">Cancel</button>
+              <button id="confirm-swap" class="btn btn-primary">Confirm Swap</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- WalletConnect QR Modal -->
       <div id="wc-modal" class="modal hidden">
         <div class="modal-content wc-modal-content">
